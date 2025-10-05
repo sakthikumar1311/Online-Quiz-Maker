@@ -1,0 +1,1093 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Play, Save, Clock, Award, BookOpen, Users, TrendingUp, Home, PlusCircle, FileText, Settings, LogOut, Menu, X, Check, AlertCircle } from 'lucide-react';
+
+export default function QuizMakerApp() {
+  const [currentView, setCurrentView] = useState('login');
+  const [user, setUser] = useState(null);
+  const [quizzes, setQuizzes] = useState([]);
+  const [currentQuiz, setCurrentQuiz] = useState(null);
+  const [editingQuiz, setEditingQuiz] = useState(null);
+  const [quizResults, setQuizResults] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notification, setNotification] = useState(null);
+
+  // Sample quiz data
+  useEffect(() => {
+    const sampleQuizzes = [
+      {
+        id: 1,
+        title: 'JavaScript Fundamentals',
+        description: 'Test your knowledge of JavaScript basics',
+        category: 'Programming',
+        difficulty: 'Intermediate',
+        timeLimit: 15,
+        questions: [
+          {
+            id: 1,
+            question: 'What is the correct way to declare a variable in JavaScript?',
+            options: ['var x = 5', 'variable x = 5', 'v x = 5', 'declare x = 5'],
+            correct: 0,
+            points: 10
+          },
+          {
+            id: 2,
+            question: 'Which method is used to add an element to the end of an array?',
+            options: ['append()', 'push()', 'add()', 'insert()'],
+            correct: 1,
+            points: 10
+          }
+        ],
+        createdBy: 'admin',
+        attempts: 45,
+        avgScore: 85
+      }
+    ];
+    setQuizzes(sampleQuizzes);
+  }, []);
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleLogin = (username, password) => {
+    if (username && password) {
+      setUser({ username, role: 'user' });
+      setCurrentView('dashboard');
+      showNotification('Welcome back!');
+    }
+  };
+
+  const handleRegister = (username, email, password) => {
+    if (username && email && password) {
+      setUser({ username, email, role: 'user' });
+      setCurrentView('dashboard');
+      showNotification('Account created successfully!');
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentView('login');
+    showNotification('Logged out successfully');
+  };
+
+  const createNewQuiz = () => {
+    const newQuiz = {
+      id: Date.now(),
+      title: '',
+      description: '',
+      category: '',
+      difficulty: 'Easy',
+      timeLimit: 10,
+      questions: [],
+      createdBy: user.username,
+      attempts: 0,
+      avgScore: 0
+    };
+    setEditingQuiz(newQuiz);
+    setCurrentView('create');
+  };
+
+  const addQuestion = () => {
+    const newQuestion = {
+      id: Date.now(),
+      question: '',
+      options: ['', '', '', ''],
+      correct: 0,
+      points: 10
+    };
+    setEditingQuiz({
+      ...editingQuiz,
+      questions: [...editingQuiz.questions, newQuestion]
+    });
+  };
+
+  const updateQuestion = (qId, field, value) => {
+    setEditingQuiz({
+      ...editingQuiz,
+      questions: editingQuiz.questions.map(q =>
+        q.id === qId ? { ...q, [field]: value } : q
+      )
+    });
+  };
+
+  const updateOption = (qId, optIndex, value) => {
+    setEditingQuiz({
+      ...editingQuiz,
+      questions: editingQuiz.questions.map(q =>
+        q.id === qId ? {
+          ...q,
+          options: q.options.map((opt, i) => i === optIndex ? value : opt)
+        } : q
+      )
+    });
+  };
+
+  const deleteQuestion = (qId) => {
+    setEditingQuiz({
+      ...editingQuiz,
+      questions: editingQuiz.questions.filter(q => q.id !== qId)
+    });
+  };
+
+  const saveQuiz = () => {
+    if (!editingQuiz.title || editingQuiz.questions.length === 0) {
+      showNotification('Please add a title and at least one question', 'error');
+      return;
+    }
+    
+    const existingIndex = quizzes.findIndex(q => q.id === editingQuiz.id);
+    if (existingIndex >= 0) {
+      setQuizzes(quizzes.map(q => q.id === editingQuiz.id ? editingQuiz : q));
+      showNotification('Quiz updated successfully!');
+    } else {
+      setQuizzes([...quizzes, editingQuiz]);
+      showNotification('Quiz created successfully!');
+    }
+    setEditingQuiz(null);
+    setCurrentView('dashboard');
+  };
+
+  const startQuiz = (quiz) => {
+    setCurrentQuiz({
+      ...quiz,
+      currentQuestion: 0,
+      answers: [],
+      startTime: Date.now()
+    });
+    setCurrentView('taking');
+  };
+
+  const answerQuestion = (answer) => {
+    setCurrentQuiz({
+      ...currentQuiz,
+      answers: [...currentQuiz.answers, answer]
+    });
+  };
+
+  const nextQuestion = () => {
+    if (currentQuiz.currentQuestion < currentQuiz.questions.length - 1) {
+      setCurrentQuiz({
+        ...currentQuiz,
+        currentQuestion: currentQuiz.currentQuestion + 1
+      });
+    } else {
+      submitQuiz();
+    }
+  };
+
+  const submitQuiz = () => {
+    const score = currentQuiz.answers.reduce((acc, answer, idx) => {
+      return answer === currentQuiz.questions[idx].correct ? 
+        acc + currentQuiz.questions[idx].points : acc;
+    }, 0);
+    
+    const totalPoints = currentQuiz.questions.reduce((acc, q) => acc + q.points, 0);
+    const percentage = Math.round((score / totalPoints) * 100);
+    
+    const result = {
+      id: Date.now(),
+      quizId: currentQuiz.id,
+      quizTitle: currentQuiz.title,
+      score,
+      totalPoints,
+      percentage,
+      timeTaken: Math.round((Date.now() - currentQuiz.startTime) / 1000),
+      date: new Date().toLocaleDateString()
+    };
+    
+    setQuizResults([result, ...quizResults]);
+    setCurrentQuiz({ ...currentQuiz, result });
+    setCurrentView('results');
+    showNotification(`Quiz completed! Score: ${percentage}%`);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
+          notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'
+        } text-white`}>
+          {notification.type === 'error' ? <AlertCircle size={20} /> : <Check size={20} />}
+          {notification.message}
+        </div>
+      )}
+
+      {currentView === 'login' && <LoginView onLogin={handleLogin} onRegister={handleRegister} />}
+      
+      {currentView === 'dashboard' && (
+        <DashboardLayout 
+          user={user} 
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          onLogout={handleLogout}
+          setCurrentView={setCurrentView}
+        >
+          <Dashboard 
+            quizzes={quizzes} 
+            quizResults={quizResults}
+            onCreateQuiz={createNewQuiz}
+            onStartQuiz={startQuiz}
+            onEditQuiz={(quiz) => {
+              setEditingQuiz(quiz);
+              setCurrentView('create');
+            }}
+            onDeleteQuiz={(id) => {
+              setQuizzes(quizzes.filter(q => q.id !== id));
+              showNotification('Quiz deleted');
+            }}
+          />
+        </DashboardLayout>
+      )}
+
+      {currentView === 'create' && editingQuiz && (
+        <DashboardLayout 
+          user={user} 
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          onLogout={handleLogout}
+          setCurrentView={setCurrentView}
+        >
+          <QuizCreator 
+            quiz={editingQuiz}
+            setQuiz={setEditingQuiz}
+            onSave={saveQuiz}
+            onCancel={() => {
+              setEditingQuiz(null);
+              setCurrentView('dashboard');
+            }}
+            addQuestion={addQuestion}
+            updateQuestion={updateQuestion}
+            updateOption={updateOption}
+            deleteQuestion={deleteQuestion}
+          />
+        </DashboardLayout>
+      )}
+
+      {currentView === 'taking' && currentQuiz && (
+        <QuizTaker 
+          quiz={currentQuiz}
+          onAnswer={answerQuestion}
+          onNext={nextQuestion}
+          onSubmit={submitQuiz}
+        />
+      )}
+
+      {currentView === 'results' && currentQuiz && (
+        <ResultsView 
+          quiz={currentQuiz}
+          onBackToDashboard={() => {
+            setCurrentQuiz(null);
+            setCurrentView('dashboard');
+          }}
+        />
+      )}
+
+      {currentView === 'myquizzes' && (
+        <DashboardLayout 
+          user={user} 
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          onLogout={handleLogout}
+          setCurrentView={setCurrentView}
+        >
+          <MyQuizzes 
+            quizzes={quizzes.filter(q => q.createdBy === user.username)}
+            onEditQuiz={(quiz) => {
+              setEditingQuiz(quiz);
+              setCurrentView('create');
+            }}
+            onDeleteQuiz={(id) => {
+              setQuizzes(quizzes.filter(q => q.id !== id));
+              showNotification('Quiz deleted');
+            }}
+          />
+        </DashboardLayout>
+      )}
+
+      {currentView === 'history' && (
+        <DashboardLayout 
+          user={user} 
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          onLogout={handleLogout}
+          setCurrentView={setCurrentView}
+        >
+          <QuizHistory results={quizResults} />
+        </DashboardLayout>
+      )}
+    </div>
+  );
+}
+
+function LoginView({ onLogin, onRegister }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isLogin) {
+      onLogin(formData.username, formData.password);
+    } else {
+      onRegister(formData.username, formData.email, formData.password);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-6xl flex bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-blue-600 to-purple-600 p-12 text-white flex-col justify-between">
+          <div>
+            <BookOpen size={48} className="mb-6" />
+            <h1 className="text-4xl font-bold mb-4">Online Quiz Maker</h1>
+            <p className="text-lg opacity-90">Create, share, and take quizzes with ease. Track your progress and improve your knowledge.</p>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                <Award size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold">Track Progress</h3>
+                <p className="text-sm opacity-80">Monitor your quiz performance</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                <Users size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold">Share & Collaborate</h3>
+                <p className="text-sm opacity-80">Create quizzes for everyone</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full md:w-1/2 p-12">
+          <div className="max-w-md mx-auto">
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">
+              {isLogin ? 'Welcome Back' : 'Create Account'}
+            </h2>
+            <p className="text-gray-600 mb-8">
+              {isLogin ? 'Login to continue your learning journey' : 'Sign up to start creating quizzes'}
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              min="1"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <textarea
+            value={quiz.description}
+            onChange={(e) => setQuiz({ ...quiz, description: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            rows="3"
+            placeholder="Describe your quiz"
+          />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-800">Questions</h2>
+          <button
+            onClick={addQuestion}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Add Question
+          </button>
+        </div>
+
+        {quiz.questions.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <BookOpen size={48} className="mx-auto mb-4 opacity-50" />
+            <p>No questions yet. Click "Add Question" to get started.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {quiz.questions.map((q, idx) => (
+              <div key={q.id} className="border border-gray-200 rounded-lg p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <span className="text-lg font-bold text-gray-700">Question {idx + 1}</span>
+                  <button
+                    onClick={() => deleteQuestion(q.id)}
+                    className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Question Text</label>
+                  <input
+                    type="text"
+                    value={q.question}
+                    onChange={(e) => updateQuestion(q.id, 'question', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    placeholder="Enter your question"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                  <div className="space-y-3">
+                    {q.options.map((opt, optIdx) => (
+                      <div key={optIdx} className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name={`correct-${q.id}`}
+                          checked={q.correct === optIdx}
+                          onChange={() => updateQuestion(q.id, 'correct', optIdx)}
+                          className="w-5 h-5 text-blue-600"
+                        />
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={(e) => updateOption(q.id, optIdx, e.target.value)}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                          placeholder={`Option ${optIdx + 1}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Select the correct answer using the radio button</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Points</label>
+                  <input
+                    type="number"
+                    value={q.points}
+                    onChange={(e) => updateQuestion(q.id, 'points', parseInt(e.target.value))}
+                    className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    min="1"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-4">
+        <button
+          onClick={onSave}
+          className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition flex items-center gap-2"
+        >
+          <Save size={20} />
+          Save Quiz
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QuizTaker({ quiz, onAnswer, onNext, onSubmit }) {
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(quiz.timeLimit * 60);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          onSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentQ = quiz.questions[quiz.currentQuestion];
+  const progress = ((quiz.currentQuestion + 1) / quiz.questions.length) * 100;
+
+  const handleNext = () => {
+    if (selectedAnswer !== null) {
+      onAnswer(selectedAnswer);
+      setSelectedAnswer(null);
+      onNext();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">{quiz.title}</h2>
+              <p className="text-gray-600">Question {quiz.currentQuestion + 1} of {quiz.questions.length}</p>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg font-semibold">
+              <Clock size={20} />
+              {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h3 className="text-xl font-semibold text-gray-800 mb-6">{currentQ.question}</h3>
+            <div className="space-y-3">
+              {currentQ.options.map((opt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedAnswer(idx)}
+                  className={`w-full p-4 text-left rounded-lg border-2 transition ${
+                    selectedAnswer === idx
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                      selectedAnswer === idx ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                    }`}>
+                      {selectedAnswer === idx && <Check size={16} className="text-white" />}
+                    </div>
+                    <span className="text-gray-800">{opt}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-between">
+            <div className="text-sm text-gray-500">
+              Points: {currentQ.points}
+            </div>
+            <button
+              onClick={handleNext}
+              disabled={selectedAnswer === null}
+              className={`px-8 py-3 rounded-lg font-semibold transition ${
+                selectedAnswer === null
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg'
+              }`}
+            >
+              {quiz.currentQuestion === quiz.questions.length - 1 ? 'Submit' : 'Next'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultsView({ quiz, onBackToDashboard }) {
+  const { result } = quiz;
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-8 flex items-center justify-center">
+      <div className="max-w-2xl w-full">
+        <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+          <div className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center ${
+            result.percentage >= 80 ? 'bg-green-100' :
+            result.percentage >= 60 ? 'bg-yellow-100' : 'bg-red-100'
+          }`}>
+            <Award size={48} className={
+              result.percentage >= 80 ? 'text-green-600' :
+              result.percentage >= 60 ? 'text-yellow-600' : 'text-red-600'
+            } />
+          </div>
+
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Quiz Completed!</h2>
+          <p className="text-gray-600 mb-8">{quiz.title}</p>
+
+          <div className="grid grid-cols-3 gap-6 mb-8">
+            <div className="p-6 bg-blue-50 rounded-lg">
+              <div className="text-3xl font-bold text-blue-600 mb-1">{result.percentage}%</div>
+              <div className="text-sm text-gray-600">Score</div>
+            </div>
+            <div className="p-6 bg-purple-50 rounded-lg">
+              <div className="text-3xl font-bold text-purple-600 mb-1">{result.score}/{result.totalPoints}</div>
+              <div className="text-sm text-gray-600">Points</div>
+            </div>
+            <div className="p-6 bg-orange-50 rounded-lg">
+              <div className="text-3xl font-bold text-orange-600 mb-1">{result.timeTaken}s</div>
+              <div className="text-sm text-gray-600">Time</div>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <div className="w-full bg-gray-200 rounded-full h-4">
+              <div
+                className={`h-4 rounded-full transition-all duration-500 ${
+                  result.percentage >= 80 ? 'bg-green-500' :
+                  result.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                }`}
+                style={{ width: `${result.percentage}%` }}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={onBackToDashboard}
+            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MyQuizzes({ quizzes, onEditQuiz, onDeleteQuiz }) {
+  return (
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-gray-800 mb-2">My Quizzes</h1>
+        <p className="text-gray-600">Manage your created quizzes</p>
+      </div>
+
+      {quizzes.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+          <BookOpen size={64} className="mx-auto mb-4 text-gray-300" />
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">No quizzes yet</h3>
+          <p className="text-gray-600">Create your first quiz to get started!</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {quizzes.map(quiz => (
+            <div key={quiz.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                quiz.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+                quiz.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {quiz.difficulty}
+              </span>
+              <h3 className="text-xl font-bold text-gray-800 mt-4 mb-2">{quiz.title}</h3>
+              <p className="text-gray-600 text-sm mb-4">{quiz.description}</p>
+              <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                <span>{quiz.questions.length} questions</span>
+                <span>{quiz.attempts} attempts</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onEditQuiz(quiz)}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </button>
+                <button
+                  onClick={() => onDeleteQuiz(quiz.id)}
+                  className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuizHistory({ results }) {
+  return (
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-gray-800 mb-2">Quiz History</h1>
+        <p className="text-gray-600">View your past quiz attempts</p>
+      </div>
+
+      {results.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+          <TrendingUp size={64} className="mx-auto mb-4 text-gray-300" />
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">No history yet</h3>
+          <p className="text-gray-600">Take a quiz to see your results here!</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Quiz</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Score</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Percentage</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {results.map(result => (
+                  <tr key={result.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-gray-800">{result.quizTitle}</td>
+                    <td className="px-6 py-4 text-gray-600">{result.date}</td>
+                    <td className="px-6 py-4 text-gray-800">{result.score}/{result.totalPoints}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        result.percentage >= 80 ? 'bg-green-100 text-green-700' :
+                        result.percentage >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {result.percentage}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{result.timeTaken}s</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}ring-blue-500 focus:border-transparent outline-none transition"
+                  placeholder="Enter your username"
+                  required
+                />
+              </div>
+
+              {!isLogin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                    placeholder="Enter your email"
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition"
+              >
+                {isLogin ? 'Login' : 'Create Account'}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {isLogin ? "Don't have an account? Register" : 'Already have an account? Login'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardLayout({ user, children, sidebarOpen, setSidebarOpen, onLogout, setCurrentView }) {
+  return (
+    <div className="min-h-screen flex">
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}>
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+          {sidebarOpen && <h2 className="text-xl font-bold text-gray-800">QuizMaker</h2>}
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-gray-100 rounded-lg">
+            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-2">
+          <button
+            onClick={() => setCurrentView('dashboard')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition"
+          >
+            <Home size={20} />
+            {sidebarOpen && <span>Dashboard</span>}
+          </button>
+          <button
+            onClick={() => setCurrentView('myquizzes')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition"
+          >
+            <FileText size={20} />
+            {sidebarOpen && <span>My Quizzes</span>}
+          </button>
+          <button
+            onClick={() => setCurrentView('history')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition"
+          >
+            <TrendingUp size={20} />
+            {sidebarOpen && <span>History</span>}
+          </button>
+        </nav>
+
+        <div className="p-4 border-t border-gray-200">
+          <div className={`${sidebarOpen ? 'flex' : 'block'} items-center gap-3 mb-3`}>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+              {user.username[0].toUpperCase()}
+            </div>
+            {sidebarOpen && (
+              <div className="flex-1">
+                <p className="font-semibold text-gray-800">{user.username}</p>
+                <p className="text-xs text-gray-500">User</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition"
+          >
+            <LogOut size={20} />
+            {sidebarOpen && <span>Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto">
+        {children}
+      </main>
+    </div>
+  );
+}
+
+function Dashboard({ quizzes, quizResults, onCreateQuiz, onStartQuiz, onEditQuiz, onDeleteQuiz }) {
+  const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredQuizzes = quizzes.filter(quiz => {
+    const matchesSearch = quiz.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         quiz.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filter === 'all' || quiz.difficulty === filter;
+    return matchesSearch && matchesFilter;
+  });
+
+  const stats = {
+    totalQuizzes: quizzes.length,
+    quizzesTaken: quizResults.length,
+    avgScore: quizResults.length > 0 
+      ? Math.round(quizResults.reduce((acc, r) => acc + r.percentage, 0) / quizResults.length)
+      : 0,
+    totalTime: quizResults.reduce((acc, r) => acc + r.timeTaken, 0)
+  };
+
+  return (
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-gray-800 mb-2">Dashboard</h1>
+        <p className="text-gray-600">Manage and take quizzes</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <BookOpen className="text-blue-600" size={24} />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold text-gray-800 mb-1">{stats.totalQuizzes}</h3>
+          <p className="text-gray-600 text-sm">Total Quizzes</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <Play className="text-green-600" size={24} />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold text-gray-800 mb-1">{stats.quizzesTaken}</h3>
+          <p className="text-gray-600 text-sm">Quizzes Taken</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Award className="text-purple-600" size={24} />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold text-gray-800 mb-1">{stats.avgScore}%</h3>
+          <p className="text-gray-600 text-sm">Average Score</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <Clock className="text-orange-600" size={24} />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold text-gray-800 mb-1">{Math.floor(stats.totalTime / 60)}m</h3>
+          <p className="text-gray-600 text-sm">Total Time</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <input
+            type="text"
+            placeholder="Search quizzes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          />
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          >
+            <option value="all">All Difficulties</option>
+            <option value="Easy">Easy</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Hard">Hard</option>
+          </select>
+          <button
+            onClick={onCreateQuiz}
+            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition flex items-center gap-2"
+          >
+            <PlusCircle size={20} />
+            Create Quiz
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredQuizzes.map(quiz => (
+            <div key={quiz.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
+              <div className="flex items-start justify-between mb-3">
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  quiz.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+                  quiz.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {quiz.difficulty}
+                </span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">{quiz.title}</h3>
+              <p className="text-gray-600 text-sm mb-4 line-clamp-2">{quiz.description}</p>
+              <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                <span className="flex items-center gap-1">
+                  <FileText size={16} />
+                  {quiz.questions.length} questions
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock size={16} />
+                  {quiz.timeLimit} min
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onStartQuiz(quiz)}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                >
+                  <Play size={16} />
+                  Start
+                </button>
+                <button
+                  onClick={() => onEditQuiz(quiz)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button
+                  onClick={() => onDeleteQuiz(quiz.id)}
+                  className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuizCreator({ quiz, setQuiz, onSave, onCancel, addQuestion, updateQuestion, updateOption, deleteQuestion }) {
+  return (
+    <div className="p-8 max-w-5xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-gray-800 mb-2">Create Quiz</h1>
+        <p className="text-gray-600">Design your custom quiz</p>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-6">Quiz Details</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Quiz Title</label>
+            <input
+              type="text"
+              value={quiz.title}
+              onChange={(e) => setQuiz({ ...quiz, title: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              placeholder="Enter quiz title"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+            <input
+              type="text"
+              value={quiz.category}
+              onChange={(e) => setQuiz({ ...quiz, category: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              placeholder="e.g., Programming, Science"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Difficulty</label>
+            <select
+              value={quiz.difficulty}
+              onChange={(e) => setQuiz({ ...quiz, difficulty: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            >
+              <option>Easy</option>
+              <option>Intermediate</option>
+              <option>Hard</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Time Limit (minutes)</label>
+            <input
+              type="number"
+              value={quiz.timeLimit}
+              onChange={(e) => setQuiz({ ...quiz, timeLimit: parseInt(e.target.value) })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:
